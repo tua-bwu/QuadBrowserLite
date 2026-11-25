@@ -69,14 +69,14 @@ public partial class SettingsWindow : Window
                 ItemsSource = Presets
             };
 
-            var urlBox = new TextBox
+var urlBox = new TextBox
             {
                 Height = 28,
-                VerticalContentAlignment = VerticalContentAlignment.Center,
+                VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
                 Padding = new Thickness(6, 0, 6, 0),
                 Text = cfg.Url
             };
-
+            
             var matched = Presets.FirstOrDefault(p =>
                 (!string.IsNullOrEmpty(p.Url) && string.Equals(p.Url, cfg.Url, StringComparison.OrdinalIgnoreCase)) ||
                 string.Equals(p.Name, cfg.SelectedAiName, StringComparison.OrdinalIgnoreCase));
