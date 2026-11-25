@@ -19,10 +19,10 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore QuadBrowserLite/QuadBrowserLite.csproj
+        run: dotnet restore QuadBrowserLite.csproj
 
       - name: Build & Publish (Release)
-        run: dotnet publish QuadBrowserLite/QuadBrowserLite.csproj -c Release -r win-x64 --self-contained false -o ./publish
+        run: dotnet publish QuadBrowserLite.csproj -c Release -r win-x64 --self-contained false -o ./publish
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
