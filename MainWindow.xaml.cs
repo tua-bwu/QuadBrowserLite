@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Interop;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 
@@ -10,6 +13,10 @@ namespace QuadBrowserLite;
 
 public partial class MainWindow : Window
 {
+    private const int WmNcRButtonUp = 0x00A5;
+    private const int HtCaption = 2;
+    private const double MinPaneSize = 120.0;
+
     private readonly List<string> _tempDirs = new();
     private readonly Dictionary<string, WebView2> _viewsBySlot = new();
     private List<PaneConfig> _currentConfigs = new();
@@ -31,8 +38,52 @@ public partial class MainWindow : Window
             new("右下", "Copilot", "https://copilot.microsoft.com")
         };
 
+        SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
         Closed += OnClosed;
+    }
+
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        var source = HwndSource.FromHwnd(handle);
+        source?.AddHook(WndProc);
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WmNcRButtonUp && wParam.ToInt32() == HtCaption)
+        {
+            if (FindResource("TitleBarContextMenu") is ContextMenu menu)
+            {
+                menu.Placement = PlacementMode.MousePoint;
+                menu.IsOpen = true;
+                handled = true;
+            }
+        }
+
+        return IntPtr.Zero;
+    }
+
+    private void OnCrossPointDragDelta(object sender, DragDeltaEventArgs e)
+    {
+        double totalWidth = LeftCol.ActualWidth + RightCol.ActualWidth;
+        if (totalWidth > MinPaneSize * 2)
+        {
+            double newLeft = Math.Clamp(LeftCol.ActualWidth + e.HorizontalChange, MinPaneSize, totalWidth - MinPaneSize);
+            double newRight = totalWidth - newLeft;
+            LeftCol.Width = new GridLength(newLeft, GridUnitType.Star);
+            RightCol.Width = new GridLength(newRight, GridUnitType.Star);
+        }
+
+        double totalHeight = TopRow.ActualHeight + BottomRow.ActualHeight;
+        if (totalHeight > MinPaneSize * 2)
+        {
+            double newTop = Math.Clamp(TopRow.ActualHeight + e.VerticalChange, MinPaneSize, totalHeight - MinPaneSize);
+            double newBottom = totalHeight - newTop;
+            TopRow.Height = new GridLength(newTop, GridUnitType.Star);
+            BottomRow.Height = new GridLength(newBottom, GridUnitType.Star);
+        }
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
