@@ -33,49 +33,49 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
 
-        foreach (var cfg in currentConfigs)
+        var cardsBySlot = new Dictionary<string, Border>
         {
-            var border = new Border
-            {
-                BorderBrush = System.Windows.Media.Brushes.LightGray,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(10),
-                Margin = new Thickness(0, 0, 0, 10)
-            };
+            ["左上"] = CardTopLeft,
+            ["右上"] = CardTopRight,
+            ["左下"] = CardBottomLeft,
+            ["右下"] = CardBottomRight
+        };
 
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(165) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var orderedSlots = new[] { "左上", "右上", "左下", "右下" };
+        var configMap = currentConfigs.ToDictionary(c => c.SlotLabel, c => c);
+
+        foreach (var slot in orderedSlots)
+        {
+            if (!cardsBySlot.TryGetValue(slot, out var card)) continue;
+
+            var cfg = configMap.TryGetValue(slot, out var existing)
+                ? existing
+                : new PaneConfig(slot, "ChatGPT", "https://chatgpt.com");
+
+            var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
 
             var label = new TextBlock
             {
                 Text = cfg.SlotLabel,
-                VerticalAlignment = VerticalAlignment.Center,
-                FontWeight = FontWeights.SemiBold
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 6)
             };
-            Grid.SetColumn(label, 0);
 
             var combo = new ComboBox
             {
                 Height = 28,
-                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 6),
                 DisplayMemberPath = nameof(AiPreset.Name),
                 ItemsSource = Presets
             };
-            Grid.SetColumn(combo, 1);
 
             var urlBox = new TextBox
             {
                 Height = 28,
-                VerticalAlignment = VerticalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalContentAlignment.Center,
                 Padding = new Thickness(6, 0, 6, 0),
                 Text = cfg.Url
             };
-            Grid.SetColumn(urlBox, 3);
 
             var matched = Presets.FirstOrDefault(p =>
                 (!string.IsNullOrEmpty(p.Url) && string.Equals(p.Url, cfg.Url, StringComparison.OrdinalIgnoreCase)) ||
@@ -102,11 +102,10 @@ public partial class SettingsWindow : Window
                 combo.SelectedItem = exact ?? Presets.Last();
             };
 
-            grid.Children.Add(label);
-            grid.Children.Add(combo);
-            grid.Children.Add(urlBox);
-            border.Child = grid;
-            PaneRowsPanel.Children.Add(border);
+            panel.Children.Add(label);
+            panel.Children.Add(combo);
+            panel.Children.Add(urlBox);
+            card.Child = panel;
 
             _editors.Add((combo, urlBox, cfg.SlotLabel));
         }
