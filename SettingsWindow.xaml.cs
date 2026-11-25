@@ -54,7 +54,7 @@ public partial class SettingsWindow : Window
             {
                 Text = cfg.SlotLabel,
                 VerticalAlignment = VerticalAlignment.Center,
-                FontWeight = FontWeight.SemiBold
+                FontWeight = FontWeights.SemiBold
             };
             Grid.SetColumn(label, 0);
 
