@@ -1,16 +1,27 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Window x:Class="QuadBrowserLite.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="QuadBrowserLite" Width="1400" Height="900">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="4" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="4" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWPF>true</UseWPF>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>QuadBrowserLite</AssemblyName>
-  </PropertyGroup>
+        <wv2:WebView2 x:Name="WvTopLeft" Grid.Row="0" Grid.Column="0" />
+        <GridSplitter Grid.Row="0" Grid.Column="1" Width="4" HorizontalAlignment="Stretch" />
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
-  </ItemGroup>
+        <wv2:WebView2 x:Name="WvTopRight" Grid.Row="0" Grid.Column="2" />
+        <GridSplitter Grid.Row="1" Grid.ColumnSpan="3" Height="4" HorizontalAlignment="Stretch" />
 
-</Project>
+        <wv2:WebView2 x:Name="WvBottomLeft" Grid.Row="2" Grid.Column="0" />
+        <wv2:WebView2 x:Name="WvBottomRight" Grid.Row="2" Grid.Column="2" />
+    </Grid>
+</Window>
