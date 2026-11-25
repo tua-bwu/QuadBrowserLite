@@ -3,25 +3,59 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="QuadBrowserLite" Width="1400" Height="900">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="34" ResizeBorderThickness="5" GlassFrameThickness="1" />
+    </WindowChrome.WindowChrome>
+
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="4" />
+            <RowDefinition Height="34" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="4" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
 
-        <wv2:WebView2 x:Name="WvTopLeft" Grid.Row="0" Grid.Column="0" />
-        <GridSplitter Grid.Row="0" Grid.Column="1" Width="4" HorizontalAlignment="Stretch" />
+        <!-- 上部タイトル領域：左にアプリ名、右に設定ボタン -->
+        <Grid Grid.Row="0" Background="#1E1E1E">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-        <wv2:WebView2 x:Name="WvTopRight" Grid.Row="0" Grid.Column="2" />
-        <GridSplitter Grid.Row="1" Grid.ColumnSpan="3" Height="4" HorizontalAlignment="Stretch" />
+            <TextBlock Grid.Column="0"
+                       Text="QuadBrowserLite (Private)"
+                       Foreground="White"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,0"
+                       FontWeight="SemiBold" />
 
-        <wv2:WebView2 x:Name="WvBottomLeft" Grid.Row="2" Grid.Column="0" />
-        <wv2:WebView2 x:Name="WvBottomRight" Grid.Row="2" Grid.Column="2" />
+            <Button Grid.Column="1"
+                    Content="⚙ 設定"
+                    Margin="0,4,110,4"
+                    Padding="10,0"
+                    WindowChrome.IsHitTestVisibleInChrome="True"
+                    Click="OnOpenSettingsClick" />
+        </Grid>
+
+        <!-- 4分割ブラウザ領域 -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="4" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <wv2:WebView2 x:Name="WvTopLeft" Grid.Row="0" Grid.Column="0" />
+            <GridSplitter Grid.Row="0" Grid.Column="1" Width="4" HorizontalAlignment="Stretch" />
+
+            <wv2:WebView2 x:Name="WvTopRight" Grid.Row="0" Grid.Column="2" />
+            <GridSplitter Grid.Row="1" Grid.ColumnSpan="3" Height="4" HorizontalAlignment="Stretch" />
+
+            <wv2:WebView2 x:Name="WvBottomLeft" Grid.Row="2" Grid.Column="0" />
+            <wv2:WebView2 x:Name="WvBottomRight" Grid.Row="2" Grid.Column="2" />
+        </Grid>
     </Grid>
 </Window>
