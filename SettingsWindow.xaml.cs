@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -74,7 +77,6 @@ public partial class SettingsWindow : Window
             };
             Grid.SetColumn(urlBox, 3);
 
-            // 現在のURLまたは名前から初期選択を合わせる
             var matched = Presets.FirstOrDefault(p =>
                 (!string.IsNullOrEmpty(p.Url) && string.Equals(p.Url, cfg.Url, StringComparison.OrdinalIgnoreCase)) ||
                 string.Equals(p.Name, cfg.SelectedAiName, StringComparison.OrdinalIgnoreCase));
