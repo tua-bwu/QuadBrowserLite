@@ -66,12 +66,12 @@ public partial class MainWindow : Window
         source?.AddHook(WndProc);
     }
 
-    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WmSysCommand && (wParam.ToInt32() & 0xFFF0) == SysMenuSettingsId)
+        if (msg == WmSysCommand && (wParam.ToInt64() & 0xFFFF) == SysMenuSettingsId)
         {
-            OpenSettingsDialog();
             handled = true;
+            Dispatcher.BeginInvoke(new Action(() => OpenSettingsDialog()));
         }
 
         return IntPtr.Zero;
@@ -141,24 +141,36 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OpenSettingsDialog(object? sender = null, RoutedEventArgs? e = null)
+private void OpenSettingsDialog(object? sender = null, RoutedEventArgs? e = null)
     {
-        var dialog = new SettingsWindow(_currentConfigs)
+        try
         {
-            Owner = this
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            _currentConfigs = dialog.ResultConfigs;
-
-            foreach (var cfg in _currentConfigs)
+            var dialog = new SettingsWindow(_currentConfigs)
             {
-                if (_viewsBySlot.TryGetValue(cfg.SlotLabel, out var view) && view.CoreWebView2 != null)
+                Owner = this
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                _currentConfigs = dialog.ResultConfigs;
+
+                foreach (var cfg in _currentConfigs)
                 {
-                    NavigateSafely(view, cfg.Url);
+                    if (_viewsBySlot.TryGetValue(cfg.SlotLabel, out var view) && view.CoreWebView2 != null)
+                    {
+                        NavigateSafely(view, cfg.Url);
+                    }
                 }
             }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"設定画面を開けませんでした:\n{ex.Message}",
+                "QuadBrowserLite",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
