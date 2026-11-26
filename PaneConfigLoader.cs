@@ -76,13 +76,11 @@ public static class PaneConfigLoader
             }
         }
 
-        // [urls] の順にプリセットを構築し、末尾にコード側の Custom を付与
         var presets = urlMap
             .Select(kvp => new AiPreset(kvp.Key, kvp.Value))
             .ToList();
         presets.Add(new AiPreset("Custom", string.Empty));
 
-        // pane0〜pane3 を左上・右上・左下・右下に割り当て
         var initialPanes = new List<PaneConfig>(4);
         for (int i = 0; i < 4; i++)
         {
