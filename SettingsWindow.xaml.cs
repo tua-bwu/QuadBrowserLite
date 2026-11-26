@@ -1,137 +1,191 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Interop;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Wpf;
 
 namespace QuadBrowserLite;
 
-public record AiPreset(string Name, string Url);
-
-public record PaneConfig(string SlotLabel, string SelectedAiName, string Url);
-
-public partial class SettingsWindow : Window
+public partial class MainWindow : Window
 {
-    public static readonly List<AiPreset> Presets = new()
+    private const int WmNcRButtonUp = 0x00A5;
+    private const int HtCaption = 2;
+    private const double MinPaneSize = 120.0;
+
+    private readonly List<string> _tempDirs = new();
+    private readonly Dictionary<string, WebView2> _viewsBySlot = new();
+    private List<PaneConfig> _currentConfigs = new();
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
     {
-        new AiPreset("ChatGPT", "https://chatgpt.com"),
-        new AiPreset("Duck.ai", "https://duck.ai"),
-        new AiPreset("Perplexity", "https://www.perplexity.ai"),
-        new AiPreset("Copilot", "https://copilot.microsoft.com"),
-        new AiPreset("Gemini", "https://gemini.google.com"),
-        new AiPreset("Claude", "https://claude.ai"),
-        new AiPreset("You.com", "https://you.com"),
-        new AiPreset("Phind", "https://www.phind.com"),
-        new AiPreset("任意URL（カスタム）", "")
-    };
+        public int X;
+        public int Y;
+    }
 
-    private readonly List<(ComboBox Combo, TextBox UrlBox, string SlotLabel)> _editors = new();
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out POINT lpPoint);
 
-    public List<PaneConfig> ResultConfigs { get; private set; } = new();
-
-    public SettingsWindow(IEnumerable<PaneConfig> currentConfigs)
+    public MainWindow()
     {
         InitializeComponent();
 
-        var cardsBySlot = new Dictionary<string, Border>
+        _viewsBySlot["左上"] = WvTopLeft;
+        _viewsBySlot["右上"] = WvTopRight;
+        _viewsBySlot["左下"] = WvBottomLeft;
+        _viewsBySlot["右下"] = WvBottomRight;
+
+        _currentConfigs = new List<PaneConfig>
         {
-            ["左上"] = CardTopLeft,
-            ["右上"] = CardTopRight,
-            ["左下"] = CardBottomLeft,
-            ["右下"] = CardBottomRight
+            new("左上", "ChatGPT", "https://chatgpt.com"),
+            new("右上", "Duck.ai", "https://duck.ai"),
+            new("左下", "Perplexity", "https://www.perplexity.ai"),
+            new("右下", "Copilot", "https://copilot.microsoft.com")
         };
 
-        var orderedSlots = new[] { "左上", "右上", "左下", "右下" };
-        var configMap = currentConfigs.ToDictionary(c => c.SlotLabel, c => c);
+        SourceInitialized += OnSourceInitialized;
+        Loaded += OnLoaded;
+        Closed += OnClosed;
+    }
 
-        foreach (var slot in orderedSlots)
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        var source = HwndSource.FromHwnd(handle);
+        source?.AddHook(WndProc);
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WmNcRButtonUp && wParam.ToInt32() == HtCaption)
         {
-            if (!cardsBySlot.TryGetValue(slot, out var card)) continue;
-
-            var cfg = configMap.TryGetValue(slot, out var existing)
-                ? existing
-                : new PaneConfig(slot, "ChatGPT", "https://chatgpt.com");
-
-            var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-
-            var label = new TextBlock
+            if (FindResource("TitleBarContextMenu") is ContextMenu menu && GetCursorPos(out var pt))
             {
-                Text = cfg.SlotLabel,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 6)
-            };
+                menu.PlacementTarget = this;
+                menu.Placement = PlacementMode.AbsolutePoint;
+                menu.HorizontalOffset = pt.X;
+                menu.VerticalOffset = pt.Y;
+                menu.IsOpen = true;
+                handled = true;
+            }
+        }
 
-            var combo = new ComboBox
-            {
-                Height = 28,
-                Margin = new Thickness(0, 0, 0, 6),
-                DisplayMemberPath = nameof(AiPreset.Name),
-                ItemsSource = Presets
-            };
+        return IntPtr.Zero;
+    }
 
-var urlBox = new TextBox
-            {
-                Height = 28,
-                VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
-                Padding = new Thickness(6, 0, 6, 0),
-                Text = cfg.Url
-            };
-            
-            var matched = Presets.FirstOrDefault(p =>
-                (!string.IsNullOrEmpty(p.Url) && string.Equals(p.Url, cfg.Url, StringComparison.OrdinalIgnoreCase)) ||
-                string.Equals(p.Name, cfg.SelectedAiName, StringComparison.OrdinalIgnoreCase));
-            combo.SelectedItem = matched ?? Presets.Last();
+    private void OnCrossPointDragDelta(object sender, DragDeltaEventArgs e)
+    {
+        double totalWidth = LeftCol.ActualWidth + RightCol.ActualWidth;
+        if (totalWidth > MinPaneSize * 2)
+        {
+            double newLeft = Math.Clamp(LeftCol.ActualWidth + e.HorizontalChange, MinPaneSize, totalWidth - MinPaneSize);
+            double newRight = totalWidth - newLeft;
+            LeftCol.Width = new GridLength(newLeft, GridUnitType.Star);
+            RightCol.Width = new GridLength(newRight, GridUnitType.Star);
+        }
 
-            bool updatingFromCombo = false;
-            combo.SelectionChanged += (_, _) =>
-            {
-                if (combo.SelectedItem is AiPreset preset && !string.IsNullOrEmpty(preset.Url))
-                {
-                    updatingFromCombo = true;
-                    urlBox.Text = preset.Url;
-                    updatingFromCombo = false;
-                }
-            };
-
-            urlBox.TextChanged += (_, _) =>
-            {
-                if (updatingFromCombo) return;
-                var exact = Presets.FirstOrDefault(p =>
-                    !string.IsNullOrEmpty(p.Url) &&
-                    string.Equals(p.Url, urlBox.Text.Trim(), StringComparison.OrdinalIgnoreCase));
-                combo.SelectedItem = exact ?? Presets.Last();
-            };
-
-            panel.Children.Add(label);
-            panel.Children.Add(combo);
-            panel.Children.Add(urlBox);
-            card.Child = panel;
-
-            _editors.Add((combo, urlBox, cfg.SlotLabel));
+        double totalHeight = TopRow.ActualHeight + BottomRow.ActualHeight;
+        if (totalHeight > MinPaneSize * 2)
+        {
+            double newTop = Math.Clamp(TopRow.ActualHeight + e.VerticalChange, MinPaneSize, totalHeight - MinPaneSize);
+            double newBottom = totalHeight - newTop;
+            TopRow.Height = new GridLength(newTop, GridUnitType.Star);
+            BottomRow.Height = new GridLength(newBottom, GridUnitType.Star);
         }
     }
 
-    private void OnApplyClick(object sender, RoutedEventArgs e)
+    private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        ResultConfigs = _editors.Select(ed =>
+        foreach (var cfg in _currentConfigs)
         {
-            var aiName = (ed.Combo.SelectedItem as AiPreset)?.Name ?? "任意URL（カスタム）";
-            var rawUrl = ed.UrlBox.Text.Trim();
-            if (!string.IsNullOrEmpty(rawUrl) &&
-                !rawUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-                !rawUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
-                !rawUrl.StartsWith("about:", StringComparison.OrdinalIgnoreCase))
+            if (_viewsBySlot.TryGetValue(cfg.SlotLabel, out var view))
             {
-                rawUrl = "https://" + rawUrl;
+                await InitPrivateWebViewAsync(view, cfg.Url);
             }
-            return new PaneConfig(ed.SlotLabel, aiName, rawUrl);
-        }).ToList();
-
-        DialogResult = true;
+        }
     }
 
-    private void OnCancelClick(object sender, RoutedEventArgs e)
+    private async Task InitPrivateWebViewAsync(WebView2 webView, string initialUrl)
     {
-        DialogResult = false;
+        string tempDir = Path.Combine(Path.GetTempPath(), "QuadBrowserLite_" + Guid.NewGuid().ToString("N"));
+        _tempDirs.Add(tempDir);
+
+        var env = await CoreWebView2Environment.CreateAsync(
+            browserExecutableFolder: null,
+            userDataFolder: tempDir,
+            options: new CoreWebView2EnvironmentOptions());
+
+        await webView.EnsureCoreWebView2Async(env);
+
+        webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
+        webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+
+        NavigateSafely(webView, initialUrl);
+    }
+
+    private static void NavigateSafely(WebView2 view, string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            view.Source = new Uri("about:blank");
+            return;
+        }
+
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            view.Source = uri;
+        }
+    }
+
+    private void OnOpenSettingsClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SettingsWindow(_currentConfigs)
+        {
+            Owner = this
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            _currentConfigs = dialog.ResultConfigs;
+
+            foreach (var cfg in _currentConfigs)
+            {
+                if (_viewsBySlot.TryGetValue(cfg.SlotLabel, out var view) && view.CoreWebView2 != null)
+                {
+                    NavigateSafely(view, cfg.Url);
+                }
+            }
+        }
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        foreach (var view in _viewsBySlot.Values)
+        {
+            view.Dispose();
+        }
+
+        foreach (var dir in _tempDirs)
+        {
+            try
+            {
+                if (Directory.Exists(dir))
+                {
+                    Directory.Delete(dir, recursive: true);
+                }
+            }
+            catch
+            {
+                // ロック残存時はスキップ
+            }
+        }
     }
 }
