@@ -1,0 +1,12 @@
+[panes]
+# 0: Top-Left, 1: Top-Right, 2: Bottom-Left, 3: Bottom-Right
+pane0,ChatGPT
+pane1,Gemini
+pane2,Duck.ai
+pane3,Perplexity
+
+[urls]
+ChatGPT,https://chatgpt.com/
+Gemini,https://gemini.google.com/
+Duck.ai,https://duck.ai/
+Perplexity,https://www.perplexity.ai/
