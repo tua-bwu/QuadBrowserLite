@@ -21,6 +21,7 @@ public partial class MainWindow : Window
 
     private readonly List<string> _tempDirs = new();
     private readonly Dictionary<string, WebView2> _viewsBySlot = new();
+    private List<AiPreset> _presets = new();
     private List<PaneConfig> _currentConfigs = new();
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -38,13 +39,9 @@ public partial class MainWindow : Window
         _viewsBySlot["左下"] = WvBottomLeft;
         _viewsBySlot["右下"] = WvBottomRight;
 
-        _currentConfigs = new List<PaneConfig>
-        {
-            new("左上", "ChatGPT", "https://chatgpt.com"),
-            new("右上", "Duck.ai", "https://duck.ai"),
-            new("左下", "Perplexity", "https://www.perplexity.ai"),
-            new("右下", "Copilot", "https://copilot.microsoft.com")
-        };
+        var loaded = PaneConfigLoader.Load();
+        _presets = loaded.Presets;
+        _currentConfigs = loaded.InitialPanes;
 
         SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
@@ -66,7 +63,7 @@ public partial class MainWindow : Window
         source?.AddHook(WndProc);
     }
 
-private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WmSysCommand && (wParam.ToInt64() & 0xFFFF) == SysMenuSettingsId)
         {
@@ -141,11 +138,11 @@ private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref b
         }
     }
 
-private void OpenSettingsDialog(object? sender = null, RoutedEventArgs? e = null)
+    private void OpenSettingsDialog(object? sender = null, RoutedEventArgs? e = null)
     {
         try
         {
-            var dialog = new SettingsWindow(_currentConfigs)
+            var dialog = new SettingsWindow(_currentConfigs, _presets)
             {
                 Owner = this
             };
