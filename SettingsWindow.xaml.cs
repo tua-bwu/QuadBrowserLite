@@ -12,26 +12,22 @@ public record PaneConfig(string SlotLabel, string SelectedAiName, string Url);
 
 public partial class SettingsWindow : Window
 {
-    public static readonly List<AiPreset> Presets = new()
-    {
-        new AiPreset("ChatGPT", "https://chatgpt.com"),
-        new AiPreset("Duck.ai", "https://duck.ai"),
-        new AiPreset("Perplexity", "https://www.perplexity.ai"),
-        new AiPreset("Copilot", "https://copilot.microsoft.com"),
-        new AiPreset("Gemini", "https://gemini.google.com"),
-        new AiPreset("Claude", "https://claude.ai"),
-        new AiPreset("You.com", "https://you.com"),
-        new AiPreset("Phind", "https://www.phind.com"),
-        new AiPreset("任意URL（カスタム）", "")
-    };
-
+    private readonly IReadOnlyList<AiPreset> _presets;
     private readonly List<(ComboBox Combo, TextBox UrlBox, string SlotLabel)> _editors = new();
 
     public List<PaneConfig> ResultConfigs { get; private set; } = new();
 
-    public SettingsWindow(IEnumerable<PaneConfig> currentConfigs)
+    public SettingsWindow(IEnumerable<PaneConfig> currentConfigs, IEnumerable<AiPreset> presets)
     {
         InitializeComponent();
+
+        _presets = presets.ToList();
+        if (_presets.Count == 0 || !string.IsNullOrEmpty(_presets.Last().Url))
+        {
+            var list = _presets.ToList();
+            list.Add(new AiPreset("Custom", string.Empty));
+            _presets = list;
+        }
 
         var cardsBySlot = new Dictionary<string, Border>
         {
@@ -48,9 +44,10 @@ public partial class SettingsWindow : Window
         {
             if (!cardsBySlot.TryGetValue(slot, out var card)) continue;
 
+            var fallbackPreset = _presets.FirstOrDefault(p => !string.IsNullOrEmpty(p.Url)) ?? _presets.Last();
             var cfg = configMap.TryGetValue(slot, out var existing)
                 ? existing
-                : new PaneConfig(slot, "ChatGPT", "https://chatgpt.com");
+                : new PaneConfig(slot, fallbackPreset.Name, fallbackPreset.Url);
 
             var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
 
@@ -66,7 +63,7 @@ public partial class SettingsWindow : Window
                 Height = 28,
                 Margin = new Thickness(0, 0, 0, 6),
                 DisplayMemberPath = nameof(AiPreset.Name),
-                ItemsSource = Presets
+                ItemsSource = _presets
             };
 
             var urlBox = new TextBox
@@ -77,10 +74,10 @@ public partial class SettingsWindow : Window
                 Text = cfg.Url
             };
 
-            var matched = Presets.FirstOrDefault(p =>
+            var matched = _presets.FirstOrDefault(p =>
                 (!string.IsNullOrEmpty(p.Url) && string.Equals(p.Url, cfg.Url, StringComparison.OrdinalIgnoreCase)) ||
                 string.Equals(p.Name, cfg.SelectedAiName, StringComparison.OrdinalIgnoreCase));
-            combo.SelectedItem = matched ?? Presets.Last();
+            combo.SelectedItem = matched ?? _presets.Last();
 
             bool updatingFromCombo = false;
             combo.SelectionChanged += (_, _) =>
@@ -96,10 +93,10 @@ public partial class SettingsWindow : Window
             urlBox.TextChanged += (_, _) =>
             {
                 if (updatingFromCombo) return;
-                var exact = Presets.FirstOrDefault(p =>
+                var exact = _presets.FirstOrDefault(p =>
                     !string.IsNullOrEmpty(p.Url) &&
                     string.Equals(p.Url, urlBox.Text.Trim(), StringComparison.OrdinalIgnoreCase));
-                combo.SelectedItem = exact ?? Presets.Last();
+                combo.SelectedItem = exact ?? _presets.Last();
             };
 
             panel.Children.Add(label);
@@ -115,7 +112,7 @@ public partial class SettingsWindow : Window
     {
         ResultConfigs = _editors.Select(ed =>
         {
-            var aiName = (ed.Combo.SelectedItem as AiPreset)?.Name ?? "任意URL（カスタム）";
+            var aiName = (ed.Combo.SelectedItem as AiPreset)?.Name ?? "Custom";
             var rawUrl = ed.UrlBox.Text.Trim();
             if (!string.IsNullOrEmpty(rawUrl) &&
                 !rawUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
