@@ -150,15 +150,28 @@ public partial class MainWindow : Window
 
             if (dialog.ShowDialog() == true)
             {
-                _currentConfigs = dialog.ResultConfigs;
+                var newConfigs = dialog.ResultConfigs;
 
-                foreach (var cfg in _currentConfigs)
+                foreach (var newCfg in newConfigs)
                 {
-                    if (_viewsBySlot.TryGetValue(cfg.SlotLabel, out var view) && view.CoreWebView2 != null)
+                    var oldCfg = _currentConfigs.Find(
+                        cfg => cfg.SlotLabel == newCfg.SlotLabel);
+
+                    // URLが変更されていないペインは再読み込みしない
+                    if (oldCfg != null &&
+                        string.Equals(oldCfg.Url, newCfg.Url, StringComparison.Ordinal))
                     {
-                        NavigateSafely(view, cfg.Url);
+                        continue;
+                    }
+
+                    if (_viewsBySlot.TryGetValue(newCfg.SlotLabel, out var view)
+                        && view.CoreWebView2 != null)
+                    {
+                        NavigateSafely(view, newCfg.Url);
                     }
                 }
+
+                _currentConfigs = newConfigs;
             }
         }
         catch (Exception ex)
