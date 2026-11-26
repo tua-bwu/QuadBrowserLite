@@ -24,6 +24,9 @@ jobs:
       - name: Build & Publish (Release)
         run: dotnet publish QuadBrowserLite.csproj -c Release -r win-x64 --self-contained false -o ./publish
 
+      - name: Copy LST file
+        run: Copy-Item QuadBrowserLite.lst ./publish/
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
