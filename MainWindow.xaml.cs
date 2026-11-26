@@ -14,6 +14,8 @@ namespace QuadBrowserLite;
 public partial class MainWindow : Window
 {
     private const int WmSysCommand = 0x0112;
+    private const int ScClose = 0xF060;
+    private const int MfByCommand = 0x00000000;
     private const int MfString = 0x00000000;
     private const int MfSeparator = 0x00000800;
     private const int SysMenuSettingsId = 0x1001;
@@ -54,9 +56,8 @@ public partial class MainWindow : Window
         var sysMenu = GetSystemMenu(handle, false);
         if (sysMenu != IntPtr.Zero)
         {
-            // 「閉じる」の手前（位置 6 付近）に区切り線と「設定...」を挿入
-            InsertMenu(sysMenu, 6, MfSeparator | 0x0400 /* MF_BYPOSITION */, UIntPtr.Zero, null);
-            InsertMenu(sysMenu, 7, MfString | 0x0400 /* MF_BYPOSITION */, (UIntPtr)SysMenuSettingsId, "設定...");
+            InsertMenu(sysMenu, ScClose, MfByCommand | MfString, (UIntPtr)SysMenuSettingsId, "設定...");
+            InsertMenu(sysMenu, ScClose, MfByCommand | MfSeparator, UIntPtr.Zero, null);
         }
 
         var source = HwndSource.FromHwnd(handle);
