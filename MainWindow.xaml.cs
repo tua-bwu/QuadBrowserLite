@@ -141,7 +141,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OpenSettingsDialog()
+    private void OpenSettingsDialog(object? sender = null, RoutedEventArgs? e = null)
     {
         var dialog = new SettingsWindow(_currentConfigs)
         {
