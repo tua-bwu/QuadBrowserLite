@@ -5,7 +5,7 @@
         Title="QuadBrowserLite (Private)" Width="1400" Height="900">
     <Window.Resources>
         <ContextMenu x:Key="TitleBarContextMenu">
-            <MenuItem Header="設定..." Click="OnOpenSettingsClick" />
+            <MenuItem Header="設定..." Click="OpenSettingsDialog" />
         </ContextMenu>
     </Window.Resources>
 
