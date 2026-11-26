@@ -157,11 +157,32 @@ public partial class MainWindow : Window
                     var oldCfg = _currentConfigs.Find(
                         cfg => cfg.SlotLabel == newCfg.SlotLabel);
 
-                    // URLが変更されていないペインは再読み込みしない
-                    if (oldCfg != null &&
-                        string.Equals(oldCfg.Url, newCfg.Url, StringComparison.Ordinal))
+                    if (oldCfg != null)
                     {
-                        continue;
+                        bool isSameSelection;
+
+                        if (string.Equals(oldCfg.SelectedAiName, "Custom", StringComparison.Ordinal) &&
+                            string.Equals(newCfg.SelectedAiName, "Custom", StringComparison.Ordinal))
+                        {
+                            // Custom同士はURLが完全一致する場合のみ再読み込みしない
+                            isSameSelection = string.Equals(
+                                oldCfg.Url,
+                                newCfg.Url,
+                                StringComparison.Ordinal);
+                        }
+                        else
+                        {
+                            // 通常のプリセットは選択名で比較
+                            isSameSelection = string.Equals(
+                                oldCfg.SelectedAiName,
+                                newCfg.SelectedAiName,
+                                StringComparison.Ordinal);
+                        }
+
+                        if (isSameSelection)
+                        {
+                            continue;
+                        }
                     }
 
                     if (_viewsBySlot.TryGetValue(newCfg.SlotLabel, out var view)
