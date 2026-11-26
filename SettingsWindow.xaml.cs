@@ -74,9 +74,21 @@ public partial class SettingsWindow : Window
                 Text = cfg.Url
             };
 
+            // まず選択名で検索する
             var matched = _presets.FirstOrDefault(p =>
-                (!string.IsNullOrEmpty(p.Url) && string.Equals(p.Url, cfg.Url, StringComparison.OrdinalIgnoreCase)) ||
-                string.Equals(p.Name, cfg.SelectedAiName, StringComparison.OrdinalIgnoreCase));
+                string.Equals(
+                    p.Name,
+                    cfg.SelectedAiName,
+                    StringComparison.OrdinalIgnoreCase));
+
+            // 名前で見つからない場合だけURLで検索する
+            matched ??= _presets.FirstOrDefault(p =>
+                !string.IsNullOrEmpty(p.Url) &&
+                string.Equals(
+                    p.Url,
+                    cfg.Url,
+                    StringComparison.OrdinalIgnoreCase));
+
             combo.SelectedItem = matched ?? _presets.Last();
 
             bool updatingFromCombo = false;
