@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -23,6 +24,7 @@ public partial class MainWindow : Window
 
     private readonly List<string> _tempDirs = new();
     private readonly Dictionary<string, WebView2> _viewsBySlot = new();
+    private readonly List<Window> _childWindows = new();
     private List<AiPreset> _presets = new();
     private List<PaneConfig> _currentConfigs = new();
 
@@ -47,6 +49,7 @@ public partial class MainWindow : Window
 
         SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
+        Closing += OnClosing;
         Closed += OnClosed;
     }
 
@@ -119,10 +122,86 @@ public partial class MainWindow : Window
 
         await webView.EnsureCoreWebView2Async(env);
 
+        webView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
         webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
         webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
 
         NavigateSafely(webView, initialUrl);
+    }
+
+    private async void OnNewWindowRequested(
+        object? sender,
+        CoreWebView2NewWindowRequestedEventArgs e)
+    {
+        var deferral = e.GetDeferral();
+        var childView = new WebView2();
+        var childWindow = new Window
+        {
+            Title = "QuadBrowserLite - 別ウィンドウ",
+            Width = 1000,
+            Height = 700,
+            Content = childView,
+            Owner = this
+        };
+
+        childWindow.Closed += (_, _) =>
+        {
+            _childWindows.Remove(childWindow);
+            childView.Dispose();
+        };
+
+        _childWindows.Add(childWindow);
+        e.Handled = true;
+
+        try
+        {
+            await InitPrivateWebViewAsync(childView, "about:blank");
+            e.NewWindow = childView.CoreWebView2;
+            childWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            childWindow.Close();
+            MessageBox.Show(
+                this,
+                $"別ウィンドウを開けませんでした:\n{ex.Message}",
+                "QuadBrowserLite",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            deferral.Complete();
+        }
+    }
+
+    private void OnClosing(object? sender, CancelEventArgs e)
+    {
+        if (_childWindows.Count == 0)
+        {
+            return;
+        }
+
+        var result = MessageBox.Show(
+            this,
+            $"別ウィンドウが {_childWindows.Count} 個開いています。\n"
+            + "メインウィンドウを閉じると、別ウィンドウもすべて閉じます。\n"
+            + "よろしいですか？",
+            "QuadBrowserLite",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question,
+            MessageBoxResult.No);
+
+        if (result != MessageBoxResult.Yes)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        for (int i = _childWindows.Count - 1; i >= 0; i--)
+        {
+            _childWindows[i].Close();
+        }
     }
 
     private static void NavigateSafely(WebView2 view, string url)
