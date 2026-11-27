@@ -1,24 +1,30 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace QuadBrowserLite;
 
 public partial class SettingsWindow : Window
 {
-    private readonly IReadOnlyList<AiPreset> _presets;
+    // 登録すると4つの選択肢に反映されるように ObservableCollection にする
+    private readonly ObservableCollection<AiPreset> _presets;
     private readonly List<(ComboBox Combo, TextBox UrlBox, string SlotLabel)> _editors = new();
 
     public List<PaneConfig> ResultConfigs { get; private set; } = new();
+
+    // 登録内容を含む選択肢の一覧
+    public IReadOnlyList<AiPreset> Presets => _presets;
 
     public SettingsWindow(IEnumerable<PaneConfig> currentConfigs, IEnumerable<AiPreset> presets)
     {
         InitializeComponent();
 
         // presets の末尾には Custom が入っている (PaneConfigLoader が追加する)
-        _presets = presets.ToList();
+        _presets = new ObservableCollection<AiPreset>(presets);
 
         var cardsBySlot = new Dictionary<string, Border>
         {
@@ -81,6 +87,12 @@ public partial class SettingsWindow : Window
 
             combo.SelectedItem = matched ?? _presets.Last();
 
+            // 登録済みの項目は、登録されている URL を表示する
+            if (matched != null && !string.IsNullOrEmpty(matched.Url))
+            {
+                urlBox.Text = matched.Url;
+            }
+
             bool updatingFromCombo = false;
             combo.SelectionChanged += (_, _) =>
             {
@@ -112,22 +124,143 @@ public partial class SettingsWindow : Window
 
     private void OnApplyClick(object sender, RoutedEventArgs e)
     {
-        ResultConfigs = _editors.Select(ed =>
-        {
-            var aiName = (ed.Combo.SelectedItem as AiPreset)?.Name ?? AiPreset.CustomName;
-            var rawUrl = ed.UrlBox.Text.Trim();
-            if (!string.IsNullOrEmpty(rawUrl) &&
-                !rawUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-                !rawUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
-                !rawUrl.StartsWith("about:", StringComparison.OrdinalIgnoreCase))
-            {
-                rawUrl = "https://" + rawUrl;
-            }
-            return new PaneConfig(ed.SlotLabel, aiName, rawUrl);
-        }).ToList();
-
+        ResultConfigs = ReadEditors();
         DialogResult = true;
     }
+
+    private List<PaneConfig> ReadEditors() =>
+        _editors.Select(ed => new PaneConfig(
+            ed.SlotLabel,
+            (ed.Combo.SelectedItem as AiPreset)?.Name ?? AiPreset.CustomName,
+            PaneUrl.Normalize(ed.UrlBox.Text))).ToList();
+
+    private void OnRegisterBoxKeyDown(object sender, KeyEventArgs e)
+    {
+        // Enter は「変更を反映」ではなく「登録」にする
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            OnRegisterClick(sender, e);
+        }
+    }
+
+    private void OnRegisterClick(object sender, RoutedEventArgs e)
+    {
+        StatusText.Text = string.Empty;
+
+        var name = NewNameBox.Text.Trim();
+        var url = PaneUrl.Normalize(NewUrlBox.Text);
+
+        if (name.Length == 0 || url.Length == 0)
+        {
+            ShowWarning("名前と URL を入力してください。");
+            return;
+        }
+
+        // 「,」は区切り、先頭の # ; [ はコメントや見出しとして扱われる
+        if (name.Contains(',') || name.StartsWith('#') || name.StartsWith(';') || name.StartsWith('[') ||
+            string.Equals(name, AiPreset.CustomName, StringComparison.OrdinalIgnoreCase))
+        {
+            ShowWarning($"この名前は使えません。\n「,」を含む名前、# ; [ で始まる名前、{AiPreset.CustomName} は登録できません。");
+            return;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+        {
+            ShowWarning("URL の形式が正しくありません。");
+            return;
+        }
+
+        var existing = _presets.FirstOrDefault(p =>
+            string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        if (existing != null &&
+            MessageBox.Show(
+                this,
+                $"「{existing.Name}」は登録済みです。上書きしますか？\n{existing.Url}\n→ {url}",
+                "QuadBrowserLite",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question,
+                MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            PaneListWriter.SaveUrl(name, url);
+        }
+        catch (Exception ex)
+        {
+            ShowWarning($".lst に保存できませんでした:\n{ex.Message}");
+            return;
+        }
+
+        UpdatePresets(existing, new AiPreset(name, url));
+
+        NewNameBox.Clear();
+        NewUrlBox.Clear();
+        StatusText.Text = $"「{name}」を登録しました。";
+    }
+
+    private void UpdatePresets(AiPreset? oldPreset, AiPreset newPreset)
+    {
+        // 一覧を差し替えると選択が外れるので、先に選び直す画面を控える
+        var targets = _editors
+            .Where(ed =>
+                ed.Combo.SelectedItem is AiPreset selected &&
+                (selected == oldPreset ||
+                 (selected.Name == AiPreset.CustomName &&
+                  string.Equals(PaneUrl.Normalize(ed.UrlBox.Text), newPreset.Url, StringComparison.OrdinalIgnoreCase))))
+            .ToList();
+
+        if (oldPreset != null)
+        {
+            _presets[_presets.IndexOf(oldPreset)] = newPreset;
+        }
+        else
+        {
+            // Custom は常に末尾に置く
+            _presets.Insert(_presets.Count - 1, newPreset);
+        }
+
+        foreach (var target in targets)
+        {
+            target.Combo.SelectedItem = newPreset;
+        }
+    }
+
+    private void OnSaveStartupClick(object sender, RoutedEventArgs e)
+    {
+        StatusText.Text = string.Empty;
+
+        var configs = ReadEditors();
+        var unregistered = configs
+            .Where(c => c.SelectedAiName == AiPreset.CustomName)
+            .Select(c => c.SlotLabel)
+            .ToList();
+
+        if (unregistered.Count > 0)
+        {
+            ShowWarning($"{string.Join("・", unregistered)} は Custom です。\n先に URL を登録してください。");
+            return;
+        }
+
+        try
+        {
+            PaneListWriter.SaveStartupPanes(configs);
+        }
+        catch (Exception ex)
+        {
+            ShowWarning($".lst に保存できませんでした:\n{ex.Message}");
+            return;
+        }
+
+        StatusText.Text = "この配置を、次回の起動時の設定として保存しました。";
+    }
+
+    private void ShowWarning(string message) =>
+        MessageBox.Show(this, message, "QuadBrowserLite", MessageBoxButton.OK, MessageBoxImage.Warning);
 
     private void OnCancelClick(object sender, RoutedEventArgs e)
     {

@@ -72,8 +72,14 @@ public partial class MainWindow
         var menu = CreatePopupMenu();
 
         // メニューは縦に並ぶので、左の列(左上・左下)、右の列(右上・右下)の順に追加する
+        // 各列の上下の間に区切り線を入れて、十字の形にする
         foreach (int index in new[] { 0, 2, 1, 3 })
         {
+            if (index >= 2)
+            {
+                InsertMenu(menu, AppendPosition, MfByPosition | MfSeparator, UIntPtr.Zero, null);
+            }
+
             int flags = MfByPosition | MfString;
             if (index == 1)
             {

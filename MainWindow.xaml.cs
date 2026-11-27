@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls.Primitives;
@@ -195,7 +196,12 @@ public partial class MainWindow : Window
                 Owner = this
             };
 
-            if (dialog.ShowDialog() == true)
+            bool applied = dialog.ShowDialog() == true;
+
+            // 登録した内容はキャンセルしても .lst に残るので、一覧は常に取り込む
+            _presets = dialog.Presets.ToList();
+
+            if (applied)
             {
                 var newConfigs = dialog.ResultConfigs;
 
@@ -206,25 +212,10 @@ public partial class MainWindow : Window
 
                     if (oldCfg != null)
                     {
-                        bool isSameSelection;
-
-                        if (string.Equals(oldCfg.SelectedAiName, AiPreset.CustomName, StringComparison.Ordinal) &&
-                            string.Equals(newCfg.SelectedAiName, AiPreset.CustomName, StringComparison.Ordinal))
-                        {
-                            // Custom同士はURLが完全一致する場合のみ再読み込みしない
-                            isSameSelection = string.Equals(
-                                oldCfg.Url,
-                                newCfg.Url,
-                                StringComparison.Ordinal);
-                        }
-                        else
-                        {
-                            // 通常のプリセットは選択名で比較
-                            isSameSelection = string.Equals(
-                                oldCfg.SelectedAiName,
-                                newCfg.SelectedAiName,
-                                StringComparison.Ordinal);
-                        }
+                        // 選択名と URL がどちらも同じなら再読み込みしない
+                        bool isSameSelection =
+                            string.Equals(oldCfg.SelectedAiName, newCfg.SelectedAiName, StringComparison.Ordinal) &&
+                            string.Equals(PaneUrl.Normalize(oldCfg.Url), newCfg.Url, StringComparison.Ordinal);
 
                         if (isSameSelection)
                         {
