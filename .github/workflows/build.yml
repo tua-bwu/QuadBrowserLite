@@ -29,6 +29,9 @@ jobs:
       - name: Copy LST file
         run: Copy-Item QuadBrowserLite.lst ./publish/
 
+      - name: Copy documents
+        run: Copy-Item README.md, LICENSE.md ./publish/
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
