@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls.Primitives;
@@ -19,6 +18,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, WebView2> _viewsBySlot = new();
     private List<AiPreset> _presets = new();
     private List<PaneConfig> _currentConfigs = new();
+    private bool _isClosed;
 
     public MainWindow()
     {
@@ -67,12 +67,44 @@ public partial class MainWindow : Window
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        var errors = new List<string>();
         foreach (var cfg in _currentConfigs)
         {
+            if (_isClosed)
+            {
+                return;
+            }
+
             if (_viewsBySlot.TryGetValue(cfg.SlotLabel, out var view))
             {
-                await InitPrivateWebViewAsync(view, cfg.Url);
+                try
+                {
+                    await InitPrivateWebViewAsync(view, cfg.Url);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{cfg.SlotLabel}: {ex.Message}");
+                }
             }
+        }
+
+        if (_isClosed)
+        {
+            return;
+        }
+
+        // 失敗した画面があっても、メニューは使えるようにする
+        _isInitializing = false;
+        UpdateSystemMenuState();
+
+        if (errors.Count > 0)
+        {
+            MessageBox.Show(
+                this,
+                "画面を準備できませんでした:\n" + string.Join("\n", errors),
+                "QuadBrowserLite",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
@@ -117,22 +149,22 @@ public partial class MainWindow : Window
         }
     }
 
-    // 指定した画面を .lst に書かれた URL で開き直す
-    private void ReloadPaneFromList(string slot)
+    // 指定した画面を、設定画面で指定している URL(Custom を含む)で開き直す
+    private void ReloadPane(string slot)
     {
         if (!_viewsBySlot.TryGetValue(slot, out var view) || view.CoreWebView2 == null)
         {
             return;
         }
 
+        var config = _currentConfigs.Find(c => c.SlotLabel == slot);
+        if (config == null)
+        {
+            return;
+        }
+
         try
         {
-            var config = PaneConfigLoader.Load().InitialPanes.Find(c => c.SlotLabel == slot);
-            if (config == null)
-            {
-                return;
-            }
-
             // Source への代入は同じ URL だと再読み込みされないため Navigate を使う
             if (string.IsNullOrWhiteSpace(config.Url))
             {
@@ -142,11 +174,6 @@ public partial class MainWindow : Window
             {
                 view.CoreWebView2.Navigate(uri.AbsoluteUri);
             }
-
-            // 起動処理が列挙中のリストは書き換えず、新しいリストに差し替える
-            _currentConfigs = _currentConfigs
-                .Select(c => c.SlotLabel == slot ? config : c)
-                .ToList();
         }
         catch (Exception ex)
         {
@@ -228,6 +255,8 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        _isClosed = true;
+
         // Dispose 後は取得できないので、先にブラウザプロセスを控える
         var browserProcesses = new List<Process>();
         foreach (var view in _viewsBySlot.Values)
