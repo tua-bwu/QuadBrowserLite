@@ -147,7 +147,7 @@ public partial class MainWindow : Window
             Width = 1000,
             Height = 700,
             Content = childView,
-            Owner = this
+            //Owner = this
         };
 
         childWindow.Closed += (_, _) =>
