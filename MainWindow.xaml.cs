@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -46,6 +47,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        PrivateDataCleaner.DeleteLeftovers();
 
         _viewsBySlot["左上"] = WvTopLeft;
         _viewsBySlot["右上"] = WvTopRight;
@@ -121,7 +123,7 @@ public partial class MainWindow : Window
 
     private async Task InitPrivateWebViewAsync(WebView2 webView, string initialUrl)
     {
-        string tempDir = Path.Combine(Path.GetTempPath(), "QuadBrowserLite_" + Guid.NewGuid().ToString("N"));
+        string tempDir = PrivateDataCleaner.NewDirectoryPath();
         _tempDirs.Add(tempDir);
 
         var env = await CoreWebView2Environment.CreateAsync(
@@ -129,13 +131,21 @@ public partial class MainWindow : Window
             userDataFolder: tempDir,
             options: new CoreWebView2EnvironmentOptions());
 
-        await webView.EnsureCoreWebView2Async(env);
+        await webView.EnsureCoreWebView2Async(env, CreatePrivateOptions(env));
 
         webView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
         webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
         webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
 
         NavigateSafely(webView, initialUrl);
+    }
+
+    // シークレットモード(InPrivate)で WebView2 を作る
+    private static CoreWebView2ControllerOptions CreatePrivateOptions(CoreWebView2Environment env)
+    {
+        var options = env.CreateCoreWebView2ControllerOptions();
+        options.IsInPrivateModeEnabled = true;
+        return options;
     }
 
     private async void OnNewWindowRequested(
@@ -173,7 +183,9 @@ public partial class MainWindow : Window
             childWindow.Show();
 
             // 元のWebView2と同じ環境を使用する
-            await childView.EnsureCoreWebView2Async(sourceCore.Environment);
+            await childView.EnsureCoreWebView2Async(
+                sourceCore.Environment,
+                CreatePrivateOptions(sourceCore.Environment));
 
             childView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
             childView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
@@ -189,7 +201,7 @@ public partial class MainWindow : Window
 
             MessageBox.Show(
                 this,
-                $"別ウィンドウを開けませんでした:\\n{ex.Message}",
+                $"別ウィンドウを開けませんでした:\n{ex.Message}",
                 "QuadBrowserLite",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -322,24 +334,25 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        // Dispose 後は取得できないので、先にブラウザプロセスを控える
+        var browserProcesses = new List<Process>();
         foreach (var view in _viewsBySlot.Values)
-        {
-            view.Dispose();
-        }
-
-        foreach (var dir in _tempDirs)
         {
             try
             {
-                if (Directory.Exists(dir))
+                if (view.CoreWebView2 != null)
                 {
-                    Directory.Delete(dir, recursive: true);
+                    browserProcesses.Add(Process.GetProcessById((int)view.CoreWebView2.BrowserProcessId));
                 }
             }
             catch
             {
-                // ロック残存時はスキップ
+                // すでに終了している場合は待たない
             }
+
+            view.Dispose();
         }
+
+        PrivateDataCleaner.DeleteAfterExit(browserProcesses, _tempDirs);
     }
 }
