@@ -21,6 +21,11 @@ public partial class MainWindow : Window
     private const int MfSeparator = 0x00000800;
     private const int SysMenuSettingsId = 0x1001;
     private const double MinPaneSize = 120.0;
+    private const uint MbYesNo = 0x00000004;
+    private const uint MbIconQuestion = 0x00000020;
+    private const uint MbDefButton2 = 0x00000100;
+    private const uint MbTopMost = 0x00040000;
+    private const int IdYes = 6;
 
     private readonly List<string> _tempDirs = new();
     private readonly Dictionary<string, WebView2> _viewsBySlot = new();
@@ -33,6 +38,10 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern bool InsertMenu(IntPtr hMenu, uint uPosition, uint uFlags, UIntPtr uIDNewItem, string? lpNewItem);
+
+    // WPF の MessageBox では「ダイアログだけ最前面」を指定できないため Win32 を直接呼ぶ
+    [DllImport("user32.dll", EntryPoint = "MessageBoxW", CharSet = CharSet.Unicode)]
+    private static extern int NativeMessageBox(IntPtr hWnd, string lpText, string lpCaption, uint uType);
 
     public MainWindow()
     {
@@ -198,36 +207,27 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 子ウィンドウを現在の位置のまま一時的に前面へ出す
+        // 子ウィンドウを通常のアクティブ化で前に出す（最小化されていれば元に戻す）
         foreach (var childWindow in _childWindows)
         {
-            childWindow.Topmost = true;
-        }
-
-        MessageBoxResult result;
-        try
-        {
-            // ダイアログを子ウィンドウの前面に表示する
-            result = MessageBox.Show(
-                _childWindows[^1],
-                $"別ウィンドウが {_childWindows.Count} 個開いています。\n"
-                + "メインウィンドウを閉じると、別ウィンドウもすべて閉じます。\n"
-                + "よろしいですか？",
-                "QuadBrowserLite",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question,
-                MessageBoxResult.No);
-        }
-        finally
-        {
-            // 一時的な前面表示を解除する
-            foreach (var childWindow in _childWindows)
+            if (childWindow.WindowState == WindowState.Minimized)
             {
-                childWindow.Topmost = false;
+                SystemCommands.RestoreWindow(childWindow);
             }
+
+            childWindow.Activate();
         }
 
-        if (result != MessageBoxResult.Yes)
+        // 確認ダイアログだけを最前面に表示する
+        int result = NativeMessageBox(
+            new WindowInteropHelper(_childWindows[^1]).Handle,
+            $"別ウィンドウが {_childWindows.Count} 個開いています。\n"
+            + "メインウィンドウを閉じると、別ウィンドウもすべて閉じます。\n"
+            + "よろしいですか？",
+            "QuadBrowserLite",
+            MbYesNo | MbIconQuestion | MbDefButton2 | MbTopMost);
+
+        if (result != IdYes)
         {
             e.Cancel = true;
             return;
