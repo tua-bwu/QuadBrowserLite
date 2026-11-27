@@ -12,7 +12,10 @@ public partial class MainWindow
     private const int MfByCommand = 0x00000000;
     private const int MfString = 0x00000000;
     private const int MfSeparator = 0x00000800;
-    private const int SysMenuSettingsId = 0x1001;
+    // 独自項目の ID は下位4ビットを Windows が使うため、0x10 刻みにする
+    private const int SysMenuSettingsId = 0x1000;
+    private const int SysMenuReloadBaseId = 0x1010;
+    private const int SysMenuReloadStep = 0x10;
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr GetSystemMenu(IntPtr hWnd, bool bRevert);
@@ -26,6 +29,14 @@ public partial class MainWindow
         var sysMenu = GetSystemMenu(handle, false);
         if (sysMenu != IntPtr.Zero)
         {
+            // 「閉じる」の上に、更新4項目 / 区切り線 / 設定 / 区切り線 の順で追加する
+            for (int i = 0; i < PaneSlots.All.Length; i++)
+            {
+                var id = (UIntPtr)(SysMenuReloadBaseId + i * SysMenuReloadStep);
+                InsertMenu(sysMenu, ScClose, MfByCommand | MfString, id, $"{PaneSlots.All[i]}を更新");
+            }
+
+            InsertMenu(sysMenu, ScClose, MfByCommand | MfSeparator, UIntPtr.Zero, null);
             InsertMenu(sysMenu, ScClose, MfByCommand | MfString, (UIntPtr)SysMenuSettingsId, "設定...");
             InsertMenu(sysMenu, ScClose, MfByCommand | MfSeparator, UIntPtr.Zero, null);
         }
@@ -36,9 +47,34 @@ public partial class MainWindow
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WmSysCommand && (wParam.ToInt64() & 0xFFFF) == SysMenuSettingsId)
+        if (msg != WmSysCommand)
         {
-            handled = true;
+            return IntPtr.Zero;
+        }
+
+        int command = (int)(wParam.ToInt64() & 0xFFF0);
+        int reloadIndex = (command - SysMenuReloadBaseId) / SysMenuReloadStep;
+        bool isReload = command >= SysMenuReloadBaseId && reloadIndex < PaneSlots.All.Length;
+        if (!isReload && command != SysMenuSettingsId)
+        {
+            return IntPtr.Zero;
+        }
+
+        handled = true;
+
+        // 閉じる確認の表示中は何もしない
+        if (_isConfirmingClose)
+        {
+            return IntPtr.Zero;
+        }
+
+        if (isReload)
+        {
+            var slot = PaneSlots.All[reloadIndex];
+            Dispatcher.BeginInvoke(new Action(() => ReloadPaneFromList(slot)));
+        }
+        else
+        {
             Dispatcher.BeginInvoke(new Action(OpenSettingsDialog));
         }
 

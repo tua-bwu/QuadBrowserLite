@@ -19,6 +19,7 @@ public partial class MainWindow
     private const int IdYes = 6;
 
     private readonly List<Window> _childWindows = new();
+    private bool _isConfirmingClose;
 
     // WPF の MessageBox では「ダイアログだけ最前面」を指定できないため Win32 を直接呼ぶ
     [DllImport("user32.dll", EntryPoint = "MessageBoxW", CharSet = CharSet.Unicode)]
@@ -90,6 +91,13 @@ public partial class MainWindow
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
+        // 確認ダイアログの表示中に閉じる操作が重なっても、ダイアログは増やさない
+        if (_isConfirmingClose)
+        {
+            e.Cancel = true;
+            return;
+        }
+
         if (_childWindows.Count == 0)
         {
             return;
@@ -107,6 +115,7 @@ public partial class MainWindow
         }
 
         // 確認ダイアログだけを最前面に表示する
+        _isConfirmingClose = true;
         int result = NativeMessageBox(
             new WindowInteropHelper(_childWindows[^1]).Handle,
             $"別ウィンドウが {_childWindows.Count} 個開いています。\n"
@@ -114,6 +123,7 @@ public partial class MainWindow
             + "よろしいですか？",
             "QuadBrowserLite",
             MbYesNo | MbIconQuestion | MbDefButton2 | MbTopMost);
+        _isConfirmingClose = false;
 
         if (result != IdYes)
         {

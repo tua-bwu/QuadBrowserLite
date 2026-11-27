@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls.Primitives;
@@ -23,6 +24,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         PrivateDataCleaner.DeleteLeftovers();
+
+        // 仕切り線でも十字の中心と同じ最小サイズより小さくできないようにする
+        LeftCol.MinWidth = RightCol.MinWidth = MinPaneSize;
+        TopRow.MinHeight = BottomRow.MinHeight = MinPaneSize;
 
         _viewsBySlot[PaneSlots.TopLeft] = WvTopLeft;
         _viewsBySlot[PaneSlots.TopRight] = WvTopRight;
@@ -109,6 +114,48 @@ public partial class MainWindow : Window
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             view.Source = uri;
+        }
+    }
+
+    // 指定した画面を .lst に書かれた URL で開き直す
+    private void ReloadPaneFromList(string slot)
+    {
+        if (!_viewsBySlot.TryGetValue(slot, out var view) || view.CoreWebView2 == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var config = PaneConfigLoader.Load().InitialPanes.Find(c => c.SlotLabel == slot);
+            if (config == null)
+            {
+                return;
+            }
+
+            // Source への代入は同じ URL だと再読み込みされないため Navigate を使う
+            if (string.IsNullOrWhiteSpace(config.Url))
+            {
+                view.CoreWebView2.Navigate("about:blank");
+            }
+            else if (Uri.TryCreate(config.Url, UriKind.Absolute, out var uri))
+            {
+                view.CoreWebView2.Navigate(uri.AbsoluteUri);
+            }
+
+            // 起動処理が列挙中のリストは書き換えず、新しいリストに差し替える
+            _currentConfigs = _currentConfigs
+                .Select(c => c.SlotLabel == slot ? config : c)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"{slot}を更新できませんでした:\n{ex.Message}",
+                "QuadBrowserLite",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
