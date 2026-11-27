@@ -133,6 +133,12 @@ public partial class MainWindow : Window
         object? sender,
         CoreWebView2NewWindowRequestedEventArgs e)
     {
+        if (sender is not CoreWebView2 sourceCore)
+        {
+            e.Handled = true;
+            return;
+        }
+
         var deferral = e.GetDeferral();
         var childView = new WebView2();
         var childWindow = new Window
@@ -151,20 +157,30 @@ public partial class MainWindow : Window
         };
 
         _childWindows.Add(childWindow);
-        e.Handled = true;
 
         try
         {
-            await InitPrivateWebViewAsync(childView, "about:blank");
-            e.NewWindow = childView.CoreWebView2;
+            // 先に別ウィンドウを表示してからWebView2を初期化する
             childWindow.Show();
+
+            // 元のWebView2と同じ環境を使用する
+            await childView.EnsureCoreWebView2Async(sourceCore.Environment);
+
+            childView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
+            childView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
+            childView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+
+            e.NewWindow = childView.CoreWebView2;
+            e.Handled = true;
         }
         catch (Exception ex)
         {
             childWindow.Close();
+            e.Handled = true;
+
             MessageBox.Show(
                 this,
-                $"別ウィンドウを開けませんでした:\n{ex.Message}",
+                $"別ウィンドウを開けませんでした:\\n{ex.Message}",
                 "QuadBrowserLite",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
