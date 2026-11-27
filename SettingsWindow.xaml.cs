@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace QuadBrowserLite;
 
@@ -12,7 +13,7 @@ public partial class SettingsWindow : Window
 {
     // 登録すると4つの選択肢に反映されるように ObservableCollection にする
     private readonly ObservableCollection<AiPreset> _presets;
-    private readonly List<(ComboBox Combo, TextBox UrlBox, string SlotLabel)> _editors = new();
+    private readonly List<(ComboBox Combo, string SlotLabel)> _editors = new();
 
     public List<PaneConfig> ResultConfigs { get; private set; } = new();
 
@@ -23,7 +24,6 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
 
-        // presets の末尾には Custom が入っている (PaneConfigLoader が追加する)
         _presets = new ObservableCollection<AiPreset>(presets);
 
         var cardsBySlot = new Dictionary<string, Border>
@@ -40,16 +40,13 @@ public partial class SettingsWindow : Window
         {
             if (!cardsBySlot.TryGetValue(slot, out var card)) continue;
 
-            var fallbackPreset = _presets.FirstOrDefault(p => !string.IsNullOrEmpty(p.Url)) ?? _presets.Last();
-            var cfg = configMap.TryGetValue(slot, out var existing)
-                ? existing
-                : new PaneConfig(slot, fallbackPreset.Name, fallbackPreset.Url);
+            configMap.TryGetValue(slot, out var cfg);
 
             var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
 
             var label = new TextBlock
             {
-                Text = cfg.SlotLabel,
+                Text = slot,
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 0, 0, 6)
             };
@@ -62,63 +59,29 @@ public partial class SettingsWindow : Window
                 ItemsSource = _presets
             };
 
+            // 選んだ項目の URL を表示する(入力は下の登録欄で行う)
             var urlBox = new TextBox
             {
                 Height = 28,
                 VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
                 Padding = new Thickness(6, 0, 6, 0),
-                Text = cfg.Url
+                IsReadOnly = true,
+                Foreground = Brushes.Gray
             };
 
-            // まず選択名で検索する
-            var matched = _presets.FirstOrDefault(p =>
-                string.Equals(
-                    p.Name,
-                    cfg.SelectedAiName,
-                    StringComparison.OrdinalIgnoreCase));
-
-            // 名前で見つからない場合だけURLで検索する
-            matched ??= _presets.FirstOrDefault(p =>
-                !string.IsNullOrEmpty(p.Url) &&
-                string.Equals(
-                    p.Url,
-                    cfg.Url,
-                    StringComparison.OrdinalIgnoreCase));
-
-            combo.SelectedItem = matched ?? _presets.Last();
-
-            // 登録済みの項目は、登録されている URL を表示する
-            if (matched != null && !string.IsNullOrEmpty(matched.Url))
-            {
-                urlBox.Text = matched.Url;
-            }
-
-            bool updatingFromCombo = false;
             combo.SelectionChanged += (_, _) =>
-            {
-                if (combo.SelectedItem is AiPreset preset && !string.IsNullOrEmpty(preset.Url))
-                {
-                    updatingFromCombo = true;
-                    urlBox.Text = preset.Url;
-                    updatingFromCombo = false;
-                }
-            };
+                urlBox.Text = (combo.SelectedItem as AiPreset)?.Url ?? string.Empty;
 
-            urlBox.TextChanged += (_, _) =>
-            {
-                if (updatingFromCombo) return;
-                var exact = _presets.FirstOrDefault(p =>
-                    !string.IsNullOrEmpty(p.Url) &&
-                    string.Equals(p.Url, urlBox.Text.Trim(), StringComparison.OrdinalIgnoreCase));
-                combo.SelectedItem = exact ?? _presets.Last();
-            };
+            // 一覧にない名前なら、未選択のままにする
+            combo.SelectedItem = _presets.FirstOrDefault(p =>
+                string.Equals(p.Name, cfg?.SelectedAiName, StringComparison.OrdinalIgnoreCase));
 
             panel.Children.Add(label);
             panel.Children.Add(combo);
             panel.Children.Add(urlBox);
             card.Child = panel;
 
-            _editors.Add((combo, urlBox, cfg.SlotLabel));
+            _editors.Add((combo, slot));
         }
     }
 
@@ -128,11 +91,20 @@ public partial class SettingsWindow : Window
         DialogResult = true;
     }
 
-    private List<PaneConfig> ReadEditors() =>
-        _editors.Select(ed => new PaneConfig(
-            ed.SlotLabel,
-            (ed.Combo.SelectedItem as AiPreset)?.Name ?? AiPreset.CustomName,
-            PaneUrl.Normalize(ed.UrlBox.Text))).ToList();
+    // 項目が選ばれている画面の設定だけを返す
+    private List<PaneConfig> ReadEditors()
+    {
+        var configs = new List<PaneConfig>();
+        foreach (var (combo, slot) in _editors)
+        {
+            if (combo.SelectedItem is AiPreset preset)
+            {
+                configs.Add(new PaneConfig(slot, preset.Name, PaneUrl.Normalize(preset.Url)));
+            }
+        }
+
+        return configs;
+    }
 
     private void OnRegisterBoxKeyDown(object sender, KeyEventArgs e)
     {
@@ -158,10 +130,9 @@ public partial class SettingsWindow : Window
         }
 
         // 「,」は区切り、先頭の # ; [ はコメントや見出しとして扱われる
-        if (name.Contains(',') || name.StartsWith('#') || name.StartsWith(';') || name.StartsWith('[') ||
-            string.Equals(name, AiPreset.CustomName, StringComparison.OrdinalIgnoreCase))
+        if (name.Contains(',') || name.StartsWith('#') || name.StartsWith(';') || name.StartsWith('['))
         {
-            ShowWarning($"この名前は使えません。\n「,」を含む名前、# ; [ で始まる名前、{AiPreset.CustomName} は登録できません。");
+            ShowWarning("この名前は使えません。\n「,」を含む名前と、# ; [ で始まる名前は登録できません。");
             return;
         }
 
@@ -207,11 +178,7 @@ public partial class SettingsWindow : Window
     {
         // 一覧を差し替えると選択が外れるので、先に選び直す画面を控える
         var targets = _editors
-            .Where(ed =>
-                ed.Combo.SelectedItem is AiPreset selected &&
-                (selected == oldPreset ||
-                 (selected.Name == AiPreset.CustomName &&
-                  string.Equals(PaneUrl.Normalize(ed.UrlBox.Text), newPreset.Url, StringComparison.OrdinalIgnoreCase))))
+            .Where(ed => oldPreset != null && Equals(ed.Combo.SelectedItem, oldPreset))
             .ToList();
 
         if (oldPreset != null)
@@ -220,8 +187,7 @@ public partial class SettingsWindow : Window
         }
         else
         {
-            // Custom は常に末尾に置く
-            _presets.Insert(_presets.Count - 1, newPreset);
+            _presets.Add(newPreset);
         }
 
         foreach (var target in targets)
@@ -235,14 +201,9 @@ public partial class SettingsWindow : Window
         StatusText.Text = string.Empty;
 
         var configs = ReadEditors();
-        var unregistered = configs
-            .Where(c => c.SelectedAiName == AiPreset.CustomName)
-            .Select(c => c.SlotLabel)
-            .ToList();
-
-        if (unregistered.Count > 0)
+        if (configs.Count == 0)
         {
-            ShowWarning($"{string.Join("・", unregistered)} は Custom です。\n先に URL を登録してください。");
+            StatusText.Text = "項目が選ばれていないため、保存していません。";
             return;
         }
 

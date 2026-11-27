@@ -1,12 +1,6 @@
 namespace QuadBrowserLite;
 
-public record AiPreset(string Name, string Url)
-{
-    // URL を手入力するときの選択肢
-    public const string CustomName = "Custom";
-
-    public static AiPreset Custom { get; } = new(CustomName, string.Empty);
-}
+public record AiPreset(string Name, string Url);
 
 public static class PaneUrl
 {

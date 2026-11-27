@@ -150,7 +150,7 @@ public partial class MainWindow : Window
         }
     }
 
-    // 指定した画面を、設定画面で指定している URL(Custom を含む)で開き直す
+    // 指定した画面を、設定画面で指定している URL で開き直す
     private void ReloadPane(string slot)
     {
         if (!_viewsBySlot.TryGetValue(slot, out var view) || view.CoreWebView2 == null)
@@ -203,24 +203,23 @@ public partial class MainWindow : Window
 
             if (applied)
             {
-                var newConfigs = dialog.ResultConfigs;
-
-                foreach (var newCfg in newConfigs)
+                // 結果には項目が選ばれた画面だけが入る。ほかの画面は変えない
+                foreach (var newCfg in dialog.ResultConfigs)
                 {
-                    var oldCfg = _currentConfigs.Find(
-                        cfg => cfg.SlotLabel == newCfg.SlotLabel);
-
-                    if (oldCfg != null)
+                    int index = _currentConfigs.FindIndex(cfg => cfg.SlotLabel == newCfg.SlotLabel);
+                    if (index < 0)
                     {
-                        // 選択名と URL がどちらも同じなら再読み込みしない
-                        bool isSameSelection =
-                            string.Equals(oldCfg.SelectedAiName, newCfg.SelectedAiName, StringComparison.Ordinal) &&
-                            string.Equals(PaneUrl.Normalize(oldCfg.Url), newCfg.Url, StringComparison.Ordinal);
+                        continue;
+                    }
 
-                        if (isSameSelection)
-                        {
-                            continue;
-                        }
+                    var oldCfg = _currentConfigs[index];
+                    _currentConfigs[index] = newCfg;
+
+                    // 選択名と URL がどちらも同じなら再読み込みしない
+                    if (string.Equals(oldCfg.SelectedAiName, newCfg.SelectedAiName, StringComparison.Ordinal) &&
+                        string.Equals(PaneUrl.Normalize(oldCfg.Url), newCfg.Url, StringComparison.Ordinal))
+                    {
+                        continue;
                     }
 
                     if (_viewsBySlot.TryGetValue(newCfg.SlotLabel, out var view)
@@ -229,8 +228,6 @@ public partial class MainWindow : Window
                         NavigateSafely(view, newCfg.Url);
                     }
                 }
-
-                _currentConfigs = newConfigs;
             }
         }
         catch (Exception ex)

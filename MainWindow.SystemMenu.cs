@@ -45,7 +45,7 @@ public partial class MainWindow
     private static extern IntPtr GetSubMenu(IntPtr hMenu, int nPos);
 
     [DllImport("user32.dll")]
-    private static extern int EnableMenuItem(IntPtr hMenu, uint uIDEnableItem, uint uEnable);
+    private static extern bool RemoveMenu(IntPtr hMenu, uint uPosition, uint uFlags);
 
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
@@ -93,7 +93,7 @@ public partial class MainWindow
         return menu;
     }
 
-    // 準備中は更新と設定をグレー表示にする
+    // 準備中は更新と設定をグレー表示にして「起動待ち」を付ける
     private void UpdateSystemMenuState()
     {
         if (_systemMenu == IntPtr.Zero)
@@ -108,14 +108,21 @@ public partial class MainWindow
             SysMenuSettingsId,
             MfByCommand | MfString | grayed,
             (UIntPtr)SysMenuSettingsId,
-            _isInitializing ? "設定...（起動中）" : "設定...");
+            _isInitializing ? "設定...（起動待ち）" : "設定...");
 
         // サブメニューの親項目には ID がないので、位置を探して指定する
         for (int i = 0; i < GetMenuItemCount(_systemMenu); i++)
         {
             if (GetSubMenu(_systemMenu, i) == _reloadMenu)
             {
-                EnableMenuItem(_systemMenu, (uint)i, MfByPosition | grayed);
+                // ModifyMenu はサブメニューを破棄するため、外してから同じ位置に入れ直す
+                RemoveMenu(_systemMenu, (uint)i, MfByPosition);
+                InsertMenu(
+                    _systemMenu,
+                    (uint)i,
+                    MfByPosition | MfString | MfPopup | grayed,
+                    (UIntPtr)(ulong)_reloadMenu.ToInt64(),
+                    _isInitializing ? "更新（起動待ち）" : "更新");
                 break;
             }
         }

@@ -78,7 +78,6 @@ public static class PaneConfigLoader
         var presets = urlMap
             .Select(kvp => new AiPreset(kvp.Key, kvp.Value))
             .ToList();
-        presets.Add(AiPreset.Custom);
 
         var initialPanes = new List<PaneConfig>(4);
         for (int i = 0; i < 4; i++)
@@ -95,7 +94,7 @@ public static class PaneConfigLoader
             else
             {
                 var fallback = presets.FirstOrDefault(p => !string.IsNullOrEmpty(p.Url))
-                               ?? AiPreset.Custom;
+                               ?? new AiPreset(string.Empty, string.Empty);
                 initialPanes.Add(new PaneConfig(slotLabel, fallback.Name, fallback.Url));
             }
         }
