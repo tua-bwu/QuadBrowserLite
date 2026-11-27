@@ -1,10 +1,12 @@
 name: Build QuadBrowserLite
 
 on:
-push:
-    branches: [ "main", "TEST" ]
+  push:
+    branches:
+      - main
+      - TEST
   workflow_dispatch:
-  
+
 jobs:
   build:
     runs-on: windows-latest
