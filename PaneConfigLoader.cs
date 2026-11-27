@@ -12,7 +12,6 @@ public sealed record LoadedPaneSettings(
 public static class PaneConfigLoader
 {
     private static readonly string[] PaneKeys = { "pane0", "pane1", "pane2", "pane3" };
-    private static readonly string[] SlotLabels = { "左上", "右上", "左下", "右下" };
 
     public static string GetDefaultListPath()
     {
@@ -79,13 +78,13 @@ public static class PaneConfigLoader
         var presets = urlMap
             .Select(kvp => new AiPreset(kvp.Key, kvp.Value))
             .ToList();
-        presets.Add(new AiPreset("Custom", string.Empty));
+        presets.Add(AiPreset.Custom);
 
         var initialPanes = new List<PaneConfig>(4);
         for (int i = 0; i < 4; i++)
         {
             var paneKey = PaneKeys[i];
-            var slotLabel = SlotLabels[i];
+            var slotLabel = PaneSlots.All[i];
 
             if (paneAssignments.TryGetValue(paneKey, out var selectedName) &&
                 !string.IsNullOrWhiteSpace(selectedName))
@@ -96,7 +95,7 @@ public static class PaneConfigLoader
             else
             {
                 var fallback = presets.FirstOrDefault(p => !string.IsNullOrEmpty(p.Url))
-                               ?? new AiPreset("Custom", string.Empty);
+                               ?? AiPreset.Custom;
                 initialPanes.Add(new PaneConfig(slotLabel, fallback.Name, fallback.Url));
             }
         }

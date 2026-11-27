@@ -6,10 +6,6 @@ using System.Windows.Controls;
 
 namespace QuadBrowserLite;
 
-public record AiPreset(string Name, string Url);
-
-public record PaneConfig(string SlotLabel, string SelectedAiName, string Url);
-
 public partial class SettingsWindow : Window
 {
     private readonly IReadOnlyList<AiPreset> _presets;
@@ -21,26 +17,20 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
 
+        // presets の末尾には Custom が入っている (PaneConfigLoader が追加する)
         _presets = presets.ToList();
-        if (_presets.Count == 0 || !string.IsNullOrEmpty(_presets.Last().Url))
-        {
-            var list = _presets.ToList();
-            list.Add(new AiPreset("Custom", string.Empty));
-            _presets = list;
-        }
 
         var cardsBySlot = new Dictionary<string, Border>
         {
-            ["左上"] = CardTopLeft,
-            ["右上"] = CardTopRight,
-            ["左下"] = CardBottomLeft,
-            ["右下"] = CardBottomRight
+            [PaneSlots.TopLeft] = CardTopLeft,
+            [PaneSlots.TopRight] = CardTopRight,
+            [PaneSlots.BottomLeft] = CardBottomLeft,
+            [PaneSlots.BottomRight] = CardBottomRight
         };
 
-        var orderedSlots = new[] { "左上", "右上", "左下", "右下" };
         var configMap = currentConfigs.ToDictionary(c => c.SlotLabel, c => c);
 
-        foreach (var slot in orderedSlots)
+        foreach (var slot in PaneSlots.All)
         {
             if (!cardsBySlot.TryGetValue(slot, out var card)) continue;
 
@@ -124,7 +114,7 @@ public partial class SettingsWindow : Window
     {
         ResultConfigs = _editors.Select(ed =>
         {
-            var aiName = (ed.Combo.SelectedItem as AiPreset)?.Name ?? "Custom";
+            var aiName = (ed.Combo.SelectedItem as AiPreset)?.Name ?? AiPreset.CustomName;
             var rawUrl = ed.UrlBox.Text.Trim();
             if (!string.IsNullOrEmpty(rawUrl) &&
                 !rawUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&

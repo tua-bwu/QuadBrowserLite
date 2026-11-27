@@ -3,12 +3,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="QuadBrowserLite (Private)" Width="1400" Height="900">
-    <Window.Resources>
-        <ContextMenu x:Key="TitleBarContextMenu">
-            <MenuItem Header="設定..." Click="OpenSettingsDialog" />
-        </ContextMenu>
-    </Window.Resources>
-
     <Grid x:Name="MainGrid">
         <Grid.RowDefinitions>
             <RowDefinition x:Name="TopRow" Height="*" />
