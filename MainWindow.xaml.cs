@@ -198,15 +198,34 @@ public partial class MainWindow : Window
             return;
         }
 
-        var result = MessageBox.Show(
-            this,
-            $"別ウィンドウが {_childWindows.Count} 個開いています。\n"
-            + "メインウィンドウを閉じると、別ウィンドウもすべて閉じます。\n"
-            + "よろしいですか？",
-            "QuadBrowserLite",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question,
-            MessageBoxResult.No);
+        // 子ウィンドウを現在の位置のまま一時的に前面へ出す
+        foreach (var childWindow in _childWindows)
+        {
+            childWindow.Topmost = true;
+        }
+
+        MessageBoxResult result;
+        try
+        {
+            // ダイアログを子ウィンドウの前面に表示する
+            result = MessageBox.Show(
+                _childWindows[^1],
+                $"別ウィンドウが {_childWindows.Count} 個開いています。\n"
+                + "メインウィンドウを閉じると、別ウィンドウもすべて閉じます。\n"
+                + "よろしいですか？",
+                "QuadBrowserLite",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question,
+                MessageBoxResult.No);
+        }
+        finally
+        {
+            // 一時的な前面表示を解除する
+            foreach (var childWindow in _childWindows)
+            {
+                childWindow.Topmost = false;
+            }
+        }
 
         if (result != MessageBoxResult.Yes)
         {
