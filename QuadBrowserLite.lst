@@ -1,0 +1,12 @@
+[panes]
+# 0: Top-Left, 1: Top-Right, 2: Bottom-Left, 3: Bottom-Right
+pane0,Google Translate
+pane1,DeepL
+pane2,Microsoft Translator
+pane3,Yandex Translate
+
+[urls]
+Google Translate,https://translate.google.com/
+DeepL,https://www.deepl.com/translator
+Microsoft Translator,https://www.bing.com/translator
+Yandex Translate,https://translate.yandex.com/

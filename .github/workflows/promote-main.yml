@@ -1,0 +1,32 @@
+name: Promote TEST to main
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type PROMOTE to merge TEST into main
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    if: inputs.confirm == 'PROMOTE'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge TEST into main
+        run: |
+          git fetch origin TEST
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-ff origin/TEST -m "Merge TEST into main"
+          git push origin HEAD:main

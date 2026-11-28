@@ -1,0 +1,39 @@
+name: Build QuadBrowserLite
+
+on:
+  push:
+    branches:
+      - main
+      - TEST
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore QuadBrowserLite.csproj
+
+      - name: Build & Publish (Release)
+        run: dotnet publish QuadBrowserLite.csproj -c Release -r win-x64 --self-contained false -o ./publish
+
+      - name: Copy LST file
+        run: Copy-Item QuadBrowserLite.lst ./publish/
+
+      - name: Copy documents
+        run: Copy-Item README.md ./publish/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuadBrowserLite-win-x64
+          path: ./publish
