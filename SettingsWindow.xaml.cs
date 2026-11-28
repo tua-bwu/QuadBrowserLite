@@ -23,6 +23,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(IEnumerable<PaneConfig> currentConfigs, IEnumerable<AiPreset> presets)
     {
         InitializeComponent();
+        Closing += OnClosing;
 
         _presets = new ObservableCollection<AiPreset>(presets);
 
@@ -85,9 +86,14 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private bool _allowClose;
+
     private void OnApplyClick(object sender, RoutedEventArgs e)
     {
+        if (!ConfirmDiscardPendingInput()) return;
+
         ResultConfigs = ReadEditors();
+        _allowClose = true;
         DialogResult = true;
     }
 
@@ -223,8 +229,41 @@ public partial class SettingsWindow : Window
     private void ShowWarning(string message) =>
         MessageBox.Show(this, message, "QuadBrowserLite", MessageBoxButton.OK, MessageBoxImage.Warning);
 
+    private bool ConfirmDiscardPendingInput()
+    {
+        if (string.IsNullOrWhiteSpace(NewNameBox.Text) &&
+            string.IsNullOrWhiteSpace(NewUrlBox.Text))
+        {
+            return true;
+        }
+
+        return MessageBox.Show(
+            this,
+            "新しいサイトの入力内容が残っています。破棄して閉じますか？",
+            "QuadBrowserLite",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No) == MessageBoxResult.Yes;
+    }
+
+    private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_allowClose) return;
+
+        if (!ConfirmDiscardPendingInput())
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        _allowClose = true;
+    }
+
     private void OnCancelClick(object sender, RoutedEventArgs e)
     {
+        if (!ConfirmDiscardPendingInput()) return;
+
+        _allowClose = true;
         DialogResult = false;
     }
 }
