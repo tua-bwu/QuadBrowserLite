@@ -55,7 +55,8 @@ jobs:
           }
 
           # Debug symbols and API documentation are not needed by end users.
-          Get-ChildItem ./publish -File -Include *.pdb, *.xml |
+          Get-ChildItem ./publish -File |
+            Where-Object { $_.Extension -in @(".pdb", ".xml") } |
             Remove-Item -Force
 
           # This application uses the WPF WebView2 control, not WinForms.
