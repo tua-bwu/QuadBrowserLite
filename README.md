@@ -46,7 +46,7 @@ Cookie、キャッシュ、ローカルストレージなどのブラウザデ�
 ## 使うために必要なもの
 
 - Windows（x64）
-- .NET 8 デスクトップ ランタイム
+- .NET 10 デスクトップ ランタイム
 - Microsoft Edge WebView2 ランタイム
 
 ## 使い方
@@ -113,6 +113,6 @@ ChatGPT,https://chatgpt.com/
 ## 技術構成
 
 - C#
-- .NET 8
+- .NET 10
 - WPF
 - Microsoft Edge WebView2
