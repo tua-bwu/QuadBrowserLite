@@ -1,16 +1,12 @@
 [panes]
 # 0: Top-Left, 1: Top-Right, 2: Bottom-Left, 3: Bottom-Right
-pane0,ChatGPT
-pane1,Gemini
-pane2,Duck.ai
-pane3,Perplexity
+pane0,Google Translate
+pane1,DeepL
+pane2,Microsoft Translator
+pane3,Yandex Translate
 
 [urls]
-ChatGPT,https://chatgpt.com/
-Gemini,https://gemini.google.com/
-Duck.ai,https://duck.ai/
-Perplexity,https://www.perplexity.ai/
-Google 翻訳,https://translate.google.com/
-DeepL 翻訳,https://www.deepl.com/translator
-Microsoft 翻訳,https://www.bing.com/translator
-Yandex翻訳,https://translate.yandex.com/
+Google Translate,https://translate.google.com/
+DeepL,https://www.deepl.com/translator
+Microsoft Translator,https://www.bing.com/translator
+Yandex Translate,https://translate.yandex.com/
