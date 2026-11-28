@@ -35,6 +35,35 @@ jobs:
       - name: Build & Publish (Release)
         run: dotnet publish QuadBrowserLite.csproj -c Release -r win-x64 --self-contained false -o ./publish
 
+      - name: Remove unnecessary publish files
+        shell: pwsh
+        run: |
+          $requiredFiles = @(
+            "QuadBrowserLite.exe",
+            "QuadBrowserLite.dll",
+            "QuadBrowserLite.deps.json",
+            "QuadBrowserLite.runtimeconfig.json",
+            "Microsoft.Web.WebView2.Core.dll",
+            "Microsoft.Web.WebView2.Wpf.dll",
+            "WebView2Loader.dll"
+          )
+
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path "./publish/$file")) {
+              throw "Required publish file is missing: $file"
+            }
+          }
+
+          # Debug symbols and API documentation are not needed by end users.
+          Get-ChildItem ./publish -File -Include *.pdb, *.xml |
+            Remove-Item -Force
+
+          # This application uses the WPF WebView2 control, not WinForms.
+          Remove-Item ./publish/Microsoft.Web.WebView2.WinForms.dll -Force -ErrorAction SilentlyContinue
+
+          # Keep the native loader beside the EXE; remove the duplicate RID subfolder copy.
+          Remove-Item ./publish/runtimes -Recurse -Force -ErrorAction SilentlyContinue
+
       - name: Copy LST file
         run: Copy-Item QuadBrowserLite.lst ./publish/
 
