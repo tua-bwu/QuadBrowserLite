@@ -6,6 +6,15 @@ on:
       - main
       - TEST
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to attach the ZIP to (main only)
+        required: false
+        default: v1.0.0
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -32,8 +41,18 @@ jobs:
       - name: Copy documents
         run: Copy-Item README.md ./publish/
 
-      - name: Upload artifact
+      - name: Create release ZIP
+        run: Compress-Archive -Path ./publish/* -DestinationPath ./QuadBrowserLite-${{ github.event.inputs.release_tag || 'build' }}-win-x64.zip
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: QuadBrowserLite-win-x64
           path: ./publish
+
+      - name: Upload ZIP to GitHub Release (main only)
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: gh release upload "$env:RELEASE_TAG" ./QuadBrowserLite-$env:RELEASE_TAG-win-x64.zip --clobber
